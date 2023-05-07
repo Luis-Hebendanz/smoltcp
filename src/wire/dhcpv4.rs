@@ -44,7 +44,7 @@ bitflags! {
 }
 
 impl MessageType {
-    const fn opcode(&self) -> OpCode {
+    pub const fn opcode(&self) -> OpCode {
         match *self {
             MessageType::Discover
             | MessageType::Inform
