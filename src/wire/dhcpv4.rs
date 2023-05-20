@@ -418,6 +418,7 @@ impl<T: AsRef<[u8]>> Packet<T> {
 }
 
 impl<T: AsRef<[u8]> + AsMut<[u8]>> Packet<T> {
+
     /// Sets the optional `sname` (“server name”) and `file` (“boot file name”) fields to zero.
     ///
     /// The fields are not commonly used, so we set their value always to zero. **This method
@@ -430,6 +431,24 @@ impl<T: AsRef<[u8]> + AsMut<[u8]>> Packet<T> {
         }
         for byte in &mut data[field::FILE] {
             *byte = 0;
+        }
+    }
+
+    /// Sets the server name (called `sname` in the specification).
+    pub fn set_sname(&mut self, value: &str) {
+        let data = self.buffer.as_mut();
+        data[field::SNAME][..value.len()].copy_from_slice(value.as_bytes());
+        for i in data[field::SNAME][value.len()..].iter_mut() {
+            *i = 0;
+        }
+    }
+
+    /// Sets the boot file name (called `file` in the specification).
+    pub fn set_boot_file(&mut self, value: &str) {
+        let data = self.buffer.as_mut();
+        data[field::FILE][..value.len()].copy_from_slice(value.as_bytes());
+        for i in data[field::FILE][value.len()..].iter_mut() {
+            *i = 0;
         }
     }
 
@@ -655,6 +674,11 @@ pub struct Repr<'a> {
     pub renew_duration: Option<u32>,
     /// The DHCP IP rebind duration (T2 interval), in seconds, if specified in the packet.
     pub rebind_duration: Option<u32>,
+    /// Boot file name, null terminated string; "generic" name or null in DHCPDISCOVER, fully qualified
+    /// directory-path name in DHCPOFFER.
+    pub boot_file: Option<&'a str>,
+    /// Server host name, null terminated string.
+    pub sname: Option<&'a str>,
     /// When returned from [`Repr::parse`], this field will be `None`.
     /// However, when calling [`Repr::emit`], this field should contain only
     /// additional DHCP options not known to smoltcp.
@@ -714,6 +738,8 @@ impl<'a> Repr<'a> {
         let server_ip = packet.server_ip();
         let relay_agent_ip = packet.relay_agent_ip();
         let secs = packet.secs();
+        let sname = Some(packet.get_sname()?);
+        let boot_file = Some(packet.get_boot_file()?);
 
         // only ethernet is supported right now
         match packet.hardware_type() {
@@ -803,6 +829,8 @@ impl<'a> Repr<'a> {
         let broadcast = packet.flags().contains(Flags::BROADCAST);
 
         Ok(Repr {
+            sname,
+            boot_file,
             secs,
             transaction_id,
             client_hardware_address,
@@ -833,7 +861,8 @@ impl<'a> Repr<'a> {
     where
         T: AsRef<[u8]> + AsMut<[u8]> + ?Sized,
     {
-        packet.set_sname_and_boot_file_to_zero();
+        packet.set_sname(self.sname.unwrap_or(""));
+        packet.set_boot_file(self.boot_file.unwrap_or(""));
         packet.set_opcode(self.message_type.opcode());
         packet.set_hardware_type(Hardware::Ethernet);
         packet.set_hardware_len(6);
@@ -1145,6 +1174,8 @@ mod test {
 
     const fn offer_repr() -> Repr<'static> {
         Repr {
+            sname: None,
+            boot_file: None,
             message_type: MessageType::Offer,
             transaction_id: 0x3d1d,
             client_hardware_address: CLIENT_MAC,
@@ -1171,6 +1202,8 @@ mod test {
 
     const fn discover_repr() -> Repr<'static> {
         Repr {
+            sname: None,
+            boot_file: None,
             message_type: MessageType::Discover,
             transaction_id: 0x3d1d,
             client_hardware_address: CLIENT_MAC,

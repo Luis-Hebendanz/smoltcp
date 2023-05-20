@@ -555,6 +555,8 @@ impl<'a> Socket<'a> {
         let next_transaction_id = Self::random_transaction_id(cx);
 
         let mut dhcp_repr = DhcpRepr {
+            sname: None,
+            boot_file: None,
             message_type: DhcpMessageType::Discover,
             transaction_id: next_transaction_id,
             secs: 0,
@@ -940,6 +942,8 @@ mod test {
     };
 
     const DHCP_DEFAULT: DhcpRepr = DhcpRepr {
+        sname: None,
+        boot_file: None,
         message_type: DhcpMessageType::Unknown(99),
         transaction_id: TXID,
         secs: 0,
