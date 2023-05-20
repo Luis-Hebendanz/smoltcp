@@ -418,22 +418,6 @@ impl<T: AsRef<[u8]>> Packet<T> {
 }
 
 impl<T: AsRef<[u8]> + AsMut<[u8]>> Packet<T> {
-
-    /// Sets the optional `sname` (“server name”) and `file` (“boot file name”) fields to zero.
-    ///
-    /// The fields are not commonly used, so we set their value always to zero. **This method
-    /// must be called when creating a packet, otherwise the emitted values for these fields
-    /// are undefined!**
-    pub fn set_sname_and_boot_file_to_zero(&mut self) {
-        let data = self.buffer.as_mut();
-        for byte in &mut data[field::SNAME] {
-            *byte = 0;
-        }
-        for byte in &mut data[field::FILE] {
-            *byte = 0;
-        }
-    }
-
     /// Sets the server name (called `sname` in the specification).
     pub fn set_sname(&mut self, value: &str) {
         let data = self.buffer.as_mut();
@@ -738,8 +722,8 @@ impl<'a> Repr<'a> {
         let server_ip = packet.server_ip();
         let relay_agent_ip = packet.relay_agent_ip();
         let secs = packet.secs();
-        let sname = Some(packet.get_sname()?);
-        let boot_file = Some(packet.get_boot_file()?);
+        let sname = packet.get_sname().ok();
+        let boot_file = packet.get_boot_file().ok();
 
         // only ethernet is supported right now
         match packet.hardware_type() {
@@ -829,8 +813,8 @@ impl<'a> Repr<'a> {
         let broadcast = packet.flags().contains(Flags::BROADCAST);
 
         Ok(Repr {
-            sname,
-            boot_file,
+            sname: sname,
+            boot_file: boot_file,
             secs,
             transaction_id,
             client_hardware_address,
@@ -1116,7 +1100,8 @@ mod test {
         let mut bytes = vec![0xa5; 276];
         let mut packet = Packet::new_unchecked(&mut bytes);
         packet.set_magic_number(MAGIC_COOKIE);
-        packet.set_sname_and_boot_file_to_zero();
+        packet.set_sname("");
+        packet.set_boot_file("");
         packet.set_opcode(OpCode::Request);
         packet.set_hardware_type(Hardware::Ethernet);
         packet.set_hardware_len(6);
